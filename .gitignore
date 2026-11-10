@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.runtime-logs/
+.DS_Store
+*.pem
+coverage/
+.prisma/client
+.agents/
+.codex/
+.impeccable/
+.interface-design/
+aws/secrets/
+*.tgz

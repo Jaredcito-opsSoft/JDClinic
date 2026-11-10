@@ -1,0 +1,203 @@
+{
+  "id": "JDClinicAvisos2026",
+  "name": "JDClinic · avisos de agenda",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ece-telegram",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ece-webhook",
+      "name": "Webhook ECE",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ],
+      "webhookId": "ece-telegram"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\nconst telegramEvents = [\n  'WAITING_ROOM_DOCTOR', 'APPOINTMENT_REMINDER_PATIENT',\n  'APPOINTMENT_CONFIRMATION_PATIENT_TELEGRAM',\n  'APPOINTMENT_UPDATED_PATIENT_TELEGRAM',\n  'APPOINTMENT_CANCELLED_PATIENT_TELEGRAM',\n];\nconst emailSubjects = {\n  APPOINTMENT_CONFIRMATION_PATIENT_EMAIL: 'Tu cita en JDClinic quedó registrada',\n  APPOINTMENT_UPDATED_PATIENT_EMAIL: 'Cambio en tu cita de JDClinic',\n  APPOINTMENT_CANCELLED_PATIENT_EMAIL: 'Tu cita en JDClinic fue cancelada',\n};\nconst event = String(body.event ?? '');\nconst deliveryId = String(body.deliveryId ?? '').trim();\nconst chatId = String(body.chatId ?? '').trim();\nconst email = String(body.email ?? '').trim();\nconst text = String(body.text ?? '').trim();\nconst channel = Object.prototype.hasOwnProperty.call(emailSubjects, event) ? 'email' : 'telegram';\nconst recipientValid = channel === 'email' ? /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) : /^\\d{5,20}$/.test(chatId);\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deliveryId) || !(telegramEvents.includes(event) || Object.prototype.hasOwnProperty.call(emailSubjects, event)) || !recipientValid || !text || text.length > 500 || !text.startsWith('JDClinic ·')) {\n  throw new Error('Aviso de JDClinic inválido.');\n}\nreturn [{ json: { deliveryId, channel, chatId, email, text, subject: emailSubjects[event] ?? '' } }];"
+      },
+      "id": "validate-delivery",
+      "name": "Validar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => item.json.channel === 'telegram');"
+      },
+      "id": "route-telegram",
+      "name": "Canal Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(item => item.json.channel === 'email');"
+      },
+      "id": "route-email",
+      "name": "Canal correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-telegram",
+      "name": "Enviar Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        180
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "JDClinic <avisos@ejemplo.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-email",
+      "name": "Enviar correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        420
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, deliveryId: $(\"Validar aviso\").first().json.deliveryId }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "confirm-delivery",
+      "name": "Confirmar envío",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1240,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook ECE": {
+      "main": [
+        [
+          {
+            "node": "Validar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar aviso": {
+      "main": [
+        [
+          {
+            "node": "Canal Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Canal correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canal Telegram": {
+      "main": [
+        [
+          {
+            "node": "Enviar Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canal correo": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Telegram": {
+      "main": [
+        [
+          {
+            "node": "Confirmar envío",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar correo": {
+      "main": [
+        [
+          {
+            "node": "Confirmar envío",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": []
+}

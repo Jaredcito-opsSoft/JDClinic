@@ -1,0 +1,443 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------
+// ENUMS DE NEGOCIO Y CLÍNICOS (NOM-004 / NOM-024)
+// ---------------------------------------------------------
+
+enum RoleType {
+  ADMINISTRADOR
+  MEDICO_GENERAL
+  MEDICO_ESPECIALISTA
+  ENFERMERIA
+  RECEPCION
+}
+
+enum BiologicalSex {
+  MASCULINO
+  FEMENINO
+  INDETERMINADO
+}
+
+enum BloodType {
+  A_POSITIVO
+  A_NEGATIVO
+  B_POSITIVO
+  B_NEGATIVO
+  AB_POSITIVO
+  AB_NEGATIVO
+  O_POSITIVO
+  O_NEGATIVO
+  DESCONOCIDO
+}
+
+enum ConsultationStatus {
+  BORRADOR
+  FIRMADA
+  ANULADA_POR_ADENDA
+}
+
+enum AppointmentStatus {
+  PROGRAMADA
+  CONFIRMADA
+  EN_SALA_DE_ESPERA
+  EN_CONSULTA
+  COMPLETADA
+  CANCELADA
+  NO_ASISTIO
+}
+
+enum NotificationType {
+  WAITING_ROOM_DOCTOR
+  APPOINTMENT_REMINDER_PATIENT
+  APPOINTMENT_CONFIRMATION_PATIENT_TELEGRAM
+  APPOINTMENT_CONFIRMATION_PATIENT_EMAIL
+}
+
+enum NotificationIntent {
+  CREATED
+  UPDATED
+  CANCELLED
+}
+
+enum NotificationStatus {
+  PENDING
+  PROCESSING
+  RETRY
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum AttachmentStatus {
+  PENDING
+  READY
+  REJECTED
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
+  RECORD_READ
+  RECORD_CREATE
+  RECORD_SIGN
+  RECORD_ADDENDA
+  PRESCRIPTION_ISSUE
+  ATTACHMENT_UPLOAD
+  ATTACHMENT_DOWNLOAD
+  UNAUTHORIZED_ACCESS_ATTEMPT
+}
+
+// ---------------------------------------------------------
+// MODELOS DE USUARIOS Y ACCESO (RBAC)
+// ---------------------------------------------------------
+
+model User {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String    @unique @db.VarChar(255)
+  password_hash      String    @db.VarChar(255)
+  first_name         String    @db.VarChar(100)
+  last_name          String    @db.VarChar(100)
+  phone              String?   @db.VarChar(20)
+  cedula_profesional String?   @db.VarChar(50) // Obligatorio según NOM-004 para médicos
+  especialidad       String?   @db.VarChar(100)
+  telegram_chat_id   String?   @db.VarChar(64)
+  role               RoleType
+  is_active          Boolean   @default(true)
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+
+  refresh_tokens      RefreshToken[]
+  consultations       ConsultationSoap[]   @relation("DoctorConsultations")
+  prescriptions       Prescription[]       @relation("DoctorPrescriptions")
+  vitals_captured     VitalSigns[]         @relation("CapturedByStaff")
+  attachments         ClinicalAttachment[] @relation("UploadedByStaff")
+  audit_logs          AuditLog[]
+  doctor_appointments Appointment[]        @relation("DoctorAppointments")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  token_hash String   @unique @db.VarChar(255)
+  is_revoked Boolean  @default(false)
+  expires_at DateTime @db.Timestamptz
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------
+// PACIENTE Y ANTECEDENTES (FLE AES-256-GCM)
+// ---------------------------------------------------------
+
+model Patient {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expediente_folio     String        @unique @db.VarChar(50)
+  curp                 String?       @unique @db.VarChar(18)
+  first_name           String        @db.VarChar(100)
+  last_name            String        @db.VarChar(100)
+  birth_date           DateTime      @db.Date
+  sex                  BiologicalSex
+  blood_type           BloodType     @default(DESCONOCIDO)
+  phone                String        @db.VarChar(20)
+  email                String?       @db.VarChar(255)
+  address              String?       @db.VarChar(255)
+  emergency_contact    String?       @db.VarChar(150)
+  emergency_phone      String?       @db.VarChar(20)
+  telegram_chat_id     String?       @db.VarChar(64)
+  telegram_consent_at  DateTime?     @db.Timestamptz
+  is_active            Boolean       @default(true)
+  created_at           DateTime      @default(now()) @db.Timestamptz
+  updated_at           DateTime      @updatedAt @db.Timestamptz
+  deleted_at           DateTime?     @db.Timestamptz // Soft-delete para retención mínima legal de 5 años (NOM-004)
+
+  medical_history      MedicalHistory?
+  vitals_signs         VitalSigns[]
+  consultations        ConsultationSoap[]
+  prescriptions        Prescription[]
+  attachments          ClinicalAttachment[]
+  appointments         Appointment[]
+  audit_logs           AuditLog[]
+
+  @@index([expediente_folio])
+  @@index([curp])
+  @@index([last_name, first_name])
+  @@index([deleted_at])
+  @@map("patients")
+}
+
+model MedicalHistory {
+  id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id                  String   @unique @db.Uuid
+
+  // Alergias (Cifrado FLE)
+  allergies_ciphertext        String   @db.Text
+  allergies_iv                String   @db.VarChar(32)
+  allergies_tag               String   @db.VarChar(32)
+
+  // Antecedentes Heredofamiliares (AHF) (Cifrado FLE)
+  heredofamiliares_ciphertext String   @db.Text
+  heredofamiliares_iv         String   @db.VarChar(32)
+  heredofamiliares_tag        String   @db.VarChar(32)
+
+  // Antecedentes Personales Patológicos (APP) (Cifrado FLE)
+  patologicos_ciphertext      String   @db.Text
+  patologicos_iv              String   @db.VarChar(32)
+  patologicos_tag             String   @db.VarChar(32)
+
+  // Antecedentes Personales No Patológicos (APNP) (Cifrado FLE)
+  no_patologicos_ciphertext   String   @db.Text
+  no_patologicos_iv           String   @db.VarChar(32)
+  no_patologicos_tag          String   @db.VarChar(32)
+
+  // Antecedentes Gineco-Obstétricos (AGO) (Cifrado FLE)
+  gineco_obs_ciphertext       String?  @db.Text
+  gineco_obs_iv               String?  @db.VarChar(32)
+  gineco_obs_tag              String?  @db.VarChar(32)
+
+  updated_at                  DateTime @updatedAt @db.Timestamptz
+
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+
+  @@map("medical_histories")
+}
+
+// ---------------------------------------------------------
+// SOMATOMETRÍA Y SIGNOS VITALES
+// ---------------------------------------------------------
+
+model VitalSigns {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id            String   @db.Uuid
+  captured_by_id        String   @db.Uuid
+  weight_kg             Decimal  @db.Decimal(5, 2)
+  height_cm             Decimal  @db.Decimal(5, 2)
+  bmi                   Decimal  @db.Decimal(4, 2)
+  systolic_bp           Int
+  diastolic_bp          Int
+  heart_rate_bpm        Int
+  respiratory_rate_rpm  Int
+  temperature_celsius   Decimal  @db.Decimal(4, 2)
+  oxygen_saturation_pct Int
+  glucose_mg_dl         Decimal? @db.Decimal(6, 2)
+  notes                 String?  @db.VarChar(500)
+  created_at            DateTime @default(now()) @db.Timestamptz
+
+  patient      Patient           @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  captured_by  User              @relation("CapturedByStaff", fields: [captured_by_id], references: [id])
+  consultation ConsultationSoap?
+
+  @@index([patient_id, created_at])
+  @@map("vital_signs")
+}
+
+// ---------------------------------------------------------
+// NOTA CLÍNICA DE EVOLUCIÓN (SOAP INMUTABLE)
+// ---------------------------------------------------------
+
+model ConsultationSoap {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id             String             @db.Uuid
+  doctor_id              String             @db.Uuid
+  vital_signs_id         String?            @unique @db.Uuid
+  parent_consultation_id String?            @db.Uuid
+  status                 ConsultationStatus @default(BORRADOR)
+
+  // S - Subjetivo (FLE)
+  subjective_ciphertext  String             @db.Text
+  subjective_iv          String             @db.VarChar(32)
+  subjective_tag         String             @db.VarChar(32)
+
+  // O - Objetivo (FLE)
+  objective_ciphertext   String             @db.Text
+  objective_iv           String             @db.VarChar(32)
+  objective_tag          String             @db.VarChar(32)
+
+  // A - Análisis / Diagnóstico (FLE)
+  analysis_ciphertext    String             @db.Text
+  analysis_iv            String             @db.VarChar(32)
+  analysis_tag           String             @db.VarChar(32)
+  primary_icd10_code     String             @db.VarChar(10)
+  secondary_icd10_codes  String[]           @default([])
+
+  // P - Plan (FLE)
+  plan_ciphertext        String             @db.Text
+  plan_iv                String             @db.VarChar(32)
+  plan_tag               String             @db.VarChar(32)
+
+  digital_signature_hash String?            @db.VarChar(128)
+  signed_at              DateTime?          @db.Timestamptz
+  created_at             DateTime           @default(now()) @db.Timestamptz
+
+  patient             Patient              @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  doctor              User                 @relation("DoctorConsultations", fields: [doctor_id], references: [id], onDelete: Restrict)
+  vital_signs         VitalSigns?          @relation(fields: [vital_signs_id], references: [id], onDelete: SetNull)
+  parent_consultation ConsultationSoap?    @relation("ConsultationAddendas", fields: [parent_consultation_id], references: [id])
+  addendas            ConsultationSoap[]   @relation("ConsultationAddendas")
+  prescription        Prescription?
+  attachments         ClinicalAttachment[]
+
+  @@index([patient_id, created_at])
+  @@index([doctor_id])
+  @@index([primary_icd10_code])
+  @@map("consultations_soap")
+}
+
+// ---------------------------------------------------------
+// RECETA MÉDICA DIGITAL CON QR
+// ---------------------------------------------------------
+
+model Prescription {
+  id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consultation_id         String             @unique @db.Uuid
+  patient_id              String             @db.Uuid
+  doctor_id               String             @db.Uuid
+  qr_verification_code    String             @unique @db.VarChar(64)
+  signature_hash          String?            @db.VarChar(64)
+  expiration_date         DateTime           @db.Date
+  instructions_ciphertext String             @db.Text
+  instructions_iv         String             @db.VarChar(32)
+  instructions_tag        String             @db.VarChar(32)
+  created_at              DateTime           @default(now()) @db.Timestamptz
+
+  consultation ConsultationSoap   @relation(fields: [consultation_id], references: [id], onDelete: Restrict)
+  patient      Patient            @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  doctor       User               @relation("DoctorPrescriptions", fields: [doctor_id], references: [id], onDelete: Restrict)
+  items        PrescriptionItem[]
+
+  @@index([qr_verification_code])
+  @@index([patient_id])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescription_id      String   @db.Uuid
+  medication_name      String   @db.VarChar(150)
+  generic_name         String?  @db.VarChar(150)
+  presentation         String   @db.VarChar(100)
+  dosage               String   @db.VarChar(100)
+  frequency            String   @db.VarChar(100)
+  duration_days        Int
+  route_administration String   @db.VarChar(50)
+
+  prescription Prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+
+  @@index([prescription_id])
+  @@map("prescription_items")
+}
+
+// ---------------------------------------------------------
+// ADJUNTOS CLÍNICOS
+// ---------------------------------------------------------
+
+model ClinicalAttachment {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id      String   @db.Uuid
+  consultation_id String?  @db.Uuid
+  uploaded_by_id  String   @db.Uuid
+  file_name       String   @db.VarChar(255)
+  mime_type       String   @db.VarChar(100)
+  file_size_bytes BigInt
+  s3_bucket       String   @db.VarChar(100)
+  s3_key          String   @unique @db.VarChar(500)
+  status          AttachmentStatus @default(PENDING)
+  upload_expires_at DateTime? @db.Timestamptz
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  patient      Patient           @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  consultation ConsultationSoap? @relation(fields: [consultation_id], references: [id], onDelete: SetNull)
+  uploaded_by  User              @relation("UploadedByStaff", fields: [uploaded_by_id], references: [id])
+
+  @@index([patient_id])
+  @@map("clinical_attachments")
+}
+
+// ---------------------------------------------------------
+// CITAS Y AUTOMATIZACIONES
+// ---------------------------------------------------------
+
+model Appointment {
+  id                     String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id             String            @db.Uuid
+  doctor_id              String            @db.Uuid
+  scheduled_at           DateTime          @db.Timestamptz
+  duration_minutes       Int               @default(30)
+  status                 AppointmentStatus @default(PROGRAMADA)
+  reason                 String?           @db.VarChar(255)
+  telegram_reminder_sent Boolean           @default(false)
+  created_at             DateTime          @default(now()) @db.Timestamptz
+  updated_at             DateTime          @updatedAt @db.Timestamptz
+
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  doctor  User    @relation("DoctorAppointments", fields: [doctor_id], references: [id])
+  notifications NotificationDelivery[]
+
+  @@index([doctor_id, scheduled_at])
+  @@index([patient_id, scheduled_at])
+  @@map("appointments")
+}
+
+model NotificationDelivery {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointment_id  String             @db.Uuid
+  type            NotificationType
+  intent          NotificationIntent @default(CREATED)
+  status          NotificationStatus @default(PENDING)
+  due_at          DateTime           @db.Timestamptz
+  next_attempt_at DateTime           @db.Timestamptz
+  attempts        Int                @default(0)
+  sent_at         DateTime?          @db.Timestamptz
+  locked_at       DateTime?          @db.Timestamptz
+  last_error      String?            @db.VarChar(500)
+  created_at      DateTime           @default(now()) @db.Timestamptz
+  updated_at      DateTime           @updatedAt @db.Timestamptz
+
+  appointment Appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  @@unique([appointment_id, type])
+  @@index([status, next_attempt_at])
+  @@map("notification_deliveries")
+}
+
+// ---------------------------------------------------------
+// AUDITORÍA INMUTABLE CON HASH ENCADENADO
+// ---------------------------------------------------------
+
+model AuditLog {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String?     @db.Uuid
+  patient_id   String?     @db.Uuid
+  action       AuditAction
+  resource     String      @db.VarChar(100)
+  resource_id  String?     @db.VarChar(100)
+  ip_address   String      @db.VarChar(45)
+  user_agent   String      @db.VarChar(255)
+  details_json Json?
+  chain_hash   String      @db.VarChar(64)
+  created_at   DateTime    @default(now()) @db.Timestamptz
+
+  user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  patient Patient? @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, created_at])
+  @@index([patient_id, created_at])
+  @@index([action, created_at])
+  @@index([resource, resource_id])
+  @@map("audit_logs")
+}

@@ -1,0 +1,23 @@
+name: jdclinic
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.46.6
+    container_name: jdclinic-n8n
+    ports:
+      - "127.0.0.1:5679:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5679
+      N8N_WEBHOOK_URL: http://localhost:5679
+      GENERIC_TIMEZONE: America/Mexico_City
+      TZ: America/Mexico_City
+    volumes:
+      - jdclinic_n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  jdclinic_n8n_data:
+    external: true

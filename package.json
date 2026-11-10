@@ -1,0 +1,29 @@
+{
+  "name": "expediente-clinico-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Expediente Clínico Electrónico para Clínicas y Policonsultorios (NOM-004-SSA3-2012 / NOM-024-SSA3-2012)",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:studio": "npm --prefix backend run db:studio"
+  },
+  "keywords": [
+    "healthtech",
+    "electronic-medical-record",
+    "nom-004",
+    "nom-024",
+    "hexagonal-architecture",
+    "field-level-encryption"
+  ],
+  "author": "HealthTech Systems Architect",
+  "license": "UNLICENSED"
+}
