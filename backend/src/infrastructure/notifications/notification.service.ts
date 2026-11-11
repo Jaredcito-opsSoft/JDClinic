@@ -17,7 +17,7 @@ export function notificationText(type: NotificationType, scheduledAt: Date, inte
     dateStyle: 'medium', timeStyle: 'short', timeZone: env.CLINIC_TIME_ZONE,
   }).format(scheduledAt);
   if (type === 'WAITING_ROOM_DOCTOR') return 'JDClinic · Un paciente llegó a sala de espera. Revisa tu agenda clínica.';
-  if (type === 'APPOINTMENT_REMINDER_PATIENT') return `JDClinic · Recordatorio de tu cita mañana, ${when}. Si necesitas cambiarla, comunícate con la clínica.`;
+  if (type === 'APPOINTMENT_REMINDER_PATIENT') return `JDClinic · Recordatorio de tu cita el ${when}. Si necesitas cambiarla, comunícate con la clínica.`;
   if (intent === 'UPDATED') return `JDClinic · Tu cita fue actualizada. Fecha y hora: ${when}. Si necesitas cambiarla, comunícate con la clínica.`;
   if (intent === 'CANCELLED') return `JDClinic · Tu cita del ${when} fue cancelada. Si necesitas otra fecha, comunícate con la clínica.`;
   return `JDClinic · Tu cita quedó registrada para el ${when}. Si necesitas cambiarla, comunícate con la clínica.`;

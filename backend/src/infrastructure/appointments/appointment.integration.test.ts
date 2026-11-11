@@ -126,7 +126,7 @@ test('la API impide solapamientos por paciente y médico, incluso con solicitude
       .every((item: { intent: string }) => item.intent === 'UPDATED'));
     const reminder = movedSoon.body.data.notifications.find((item: { type: string }) => item.type === 'APPOINTMENT_REMINDER_PATIENT');
     assert.equal(reminder.status, 'SKIPPED');
-    assert.equal((await request(`/appointments/${soon.body.data.id}/notifications/${reminder.id}/retry`, 'POST', {})).status, 409);
+    assert.equal((await request(`/appointments/${soon.body.data.id}/notifications/${reminder.id}/retry`, 'POST', {})).status, 200);
   } finally {
     await prisma.appointment.deleteMany({ where: { doctor_id: { in: doctors.map(doctor => doctor.id) } } });
     await prisma.patient.deleteMany({ where: { id: { in: patients.map(patient => patient.id) } } });

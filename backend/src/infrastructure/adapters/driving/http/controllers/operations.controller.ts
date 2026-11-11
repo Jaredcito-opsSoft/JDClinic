@@ -5,7 +5,7 @@ import { AppointmentStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../../driven/persistence/prisma.client.js';
 import { auditRepo, encryptionAdapter } from '../../../../config/dependency-container.js';
-import { publicNotificationStatus, queueAppointmentChange, queueAppointmentConfirmation, queueReminder, queueWaitingRoom } from '../../../../notifications/notification.service.js';
+import { processNotifications, publicNotificationStatus, queueAppointmentChange, queueAppointmentConfirmation, queueReminder, queueWaitingRoom } from '../../../../notifications/notification.service.js';
 import { isPrescriptionSignatureValid, renderPrescriptionPdf, signPrescription } from '../../../../documents/prescription-document.service.js';
 import { AppointmentUnavailableError, OCCUPYING_STATUSES, allowedAppointmentStatuses, appointmentTransaction, findAppointmentConflict } from '../../../../appointments/appointment-availability.service.js';
 import { clinicDateKey, clinicDayRange, isValidDateKey } from '../../../../appointments/clinic-time.service.js';
@@ -230,12 +230,12 @@ export const operationsController = {
     if (!row || row.appointment_id !== req.params.id) return res.status(404).json({ success: false, message: 'Aviso no encontrado.' });
     if (req.user!.role.startsWith('MEDICO') && row.appointment.doctor_id !== req.user!.id) return res.status(403).json({ success: false, message: 'No tienes acceso a esta cita.' });
     if (!['FAILED', 'SKIPPED'].includes(row.status)) return res.status(409).json({ success: false, message: 'Este aviso ya está en proceso o fue enviado.' });
-    if (row.type === 'APPOINTMENT_REMINDER_PATIENT' && row.last_error?.includes('menos de 24 horas')) return res.status(409).json({ success: false, message: 'La cita está demasiado cerca de su horario para enviar el recordatorio de 24 horas.' });
     if (['CANCELADA', 'NO_ASISTIO', 'COMPLETADA'].includes(row.appointment.status)
       && !(row.appointment.status === 'CANCELADA' && row.intent === 'CANCELLED')) return res.status(409).json({ success: false, message: 'La cita ya no admite avisos.' });
-    if (row.type === 'APPOINTMENT_REMINDER_PATIENT' && row.due_at < new Date(Date.now() - 60 * 60 * 1000)) return res.status(409).json({ success: false, message: 'Ya pasó la ventana del recordatorio.' });
+    if (row.appointment.scheduled_at <= new Date()) return res.status(409).json({ success: false, message: 'No se puede enviar un aviso de una cita que ya pasó.' });
     await prisma.notificationDelivery.update({ where: { id: row.id }, data: { status: 'PENDING', attempts: 0, next_attempt_at: new Date(), locked_at: null, last_error: null } });
     res.json({ success: true, data: { queued: true } });
+    void processNotifications().catch(error => console.error('[Notificaciones] Error del envío manual:', error));
   },
 
   listPrescriptions: async (req: Request, res: Response) => {

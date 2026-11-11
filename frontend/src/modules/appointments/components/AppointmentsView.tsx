@@ -366,7 +366,7 @@ export const AppointmentsView: React.FC<{ role: Role; userId: string; onOpenPati
                             {notificationLabel(n)} · {{ PENDING: 'pendiente', PROCESSING: 'enviando', RETRY: 'reintentando', SENT: 'enviado', FAILED: 'falló', SKIPPED: 'omitido' }[n.status]}
                           </span>
                           {['FAILED', 'SKIPPED'].includes(n.status) && n.reason && <span className="max-w-[18rem] truncate" title={n.reason}>{n.reason}</span>}
-                          {(!['CANCELADA', 'NO_ASISTIO', 'COMPLETADA'].includes(a.status) || (a.status === 'CANCELADA' && n.intent === 'CANCELLED')) && (n.status === 'FAILED' || (n.status === 'SKIPPED' && !(n.type === 'APPOINTMENT_REMINDER_PATIENT' && n.reason?.includes('menos de 24 horas')))) && <button type="button" className="glass-chip text-[11px]" onClick={() => void retry(a.id, n.id)}>{n.status === 'SKIPPED' ? 'Enviar ahora' : 'Reintentar'}</button>}
+                          {new Date(a.scheduledAt) > new Date() && (!['CANCELADA', 'NO_ASISTIO', 'COMPLETADA'].includes(a.status) || (a.status === 'CANCELADA' && n.intent === 'CANCELLED')) && (n.status === 'FAILED' || n.status === 'SKIPPED') && <button type="button" className="glass-chip text-[11px]" onClick={() => void retry(a.id, n.id)}>{n.status === 'SKIPPED' ? 'Enviar ahora' : 'Reintentar'}</button>}
                         </div>
                       ))}
                     </div>

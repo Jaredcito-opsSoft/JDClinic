@@ -13,6 +13,7 @@ test('recordatorio se programa exactamente 24 horas antes y el mensaje omite dat
   const updated = notificationText('APPOINTMENT_CONFIRMATION_PATIENT_EMAIL', scheduled, 'UPDATED');
   const cancelled = notificationText('APPOINTMENT_CONFIRMATION_PATIENT_EMAIL', scheduled, 'CANCELLED');
   assert.match(reminder, /Recordatorio/);
+  assert.doesNotMatch(reminder, /mañana/);
   assert.match(waiting, /sala de espera/);
   assert.match(confirmation, /quedó registrada/);
   assert.match(updated, /fue actualizada/);

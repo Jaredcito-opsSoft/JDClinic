@@ -417,7 +417,7 @@ export const PatientDirectory: React.FC<{ onSelect: (patient: PatientDetail) => 
               <input
                 className="clinical-input"
                 inputMode="numeric"
-                placeholder="ID obtenido desde el bot"
+                placeholder="Chat ID proporcionado por el paciente"
                 value={reminderChat}
                 onChange={(event) => setReminderChat(event.target.value)}
               />
@@ -435,6 +435,9 @@ export const PatientDirectory: React.FC<{ onSelect: (patient: PatientDetail) => 
               {reminderSaving ? 'Guardando…' : 'Guardar configuración'}
             </button>
           </div>
+          <p className="mt-3 text-xs text-clinic-muted">
+            El paciente debe abrir <a className="font-semibold text-clinic-brand underline underline-offset-2" href="https://t.me/JDClinicAvisosBot" target="_blank" rel="noreferrer">@JDClinicAvisosBot</a> y enviar /start antes de recibir avisos.
+          </p>
         </form>
       )}
 
