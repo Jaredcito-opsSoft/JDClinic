@@ -123,7 +123,7 @@ export async function reconcileExistingAppointments(): Promise<void> {
   }
 }
 
-async function processOne(id: string): Promise<void> {
+export async function processOne(id: string): Promise<void> {
   const delivery = await prisma.notificationDelivery.findUnique({ where: { id }, include: {
     appointment: { include: {
       patient: { select: { is_active: true, deleted_at: true, email: true, telegram_chat_id: true, telegram_consent_at: true } },
@@ -157,13 +157,13 @@ async function processOne(id: string): Promise<void> {
   try {
     await sendToN8n({ id, type: delivery.type, intent: delivery.intent, chatId: isEmail ? undefined : chatId ?? undefined, email: isEmail ? email : undefined, text: notificationText(delivery.type, appointment.scheduled_at, delivery.intent) });
     const saved = await prisma.notificationDelivery.updateMany({
-      where: { id, status: 'PROCESSING', intent: delivery.intent, attempts: delivery.attempts + 1 },
+      where: { id, status: 'PROCESSING', intent: delivery.intent, attempts: delivery.attempts },
       data: { status: 'SENT', sent_at: new Date(), locked_at: null, last_error: null },
     });
     if (saved.count && isReminder) await prisma.appointment.update({ where: { id: appointment.id }, data: { telegram_reminder_sent: true } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error de envío desconocido.';
-    const attempts = delivery.attempts + 1;
+    const attempts = delivery.attempts;
     await prisma.notificationDelivery.updateMany({ where: { id, status: 'PROCESSING', intent: delivery.intent, attempts }, data: {
       status: attempts >= MAX_ATTEMPTS ? 'FAILED' : 'RETRY',
       next_attempt_at: new Date(Date.now() + RETRY_MS[Math.min(attempts - 1, RETRY_MS.length - 1)]),
