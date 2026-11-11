@@ -1,6 +1,6 @@
 # JDClinic en AWS Academy: tres EC2
 
-**Estado:** preparado para despliegue; aún no se han creado instancias ni subido datos a AWS. El curso de AWS Academy requiere iniciar sesión y sus límites pueden variar. Esta guía reproduce el esquema de TallerShop: clonar [JDClinic](https://github.com/Jaredcito-opsSoft/JDClinic) en una EC2 frontend y otra backend; instalar PostgreSQL en una tercera EC2. No se usa CloudFormation ni RDS.
+**Estado al 11 de noviembre de 2026:** preparado para despliegue; el laboratorio estaba terminado y la sesión del curso había caducado. Aún no se han creado instancias ni subido datos a AWS. Esta guía reproduce el esquema de TallerShop: clonar [JDClinic](https://github.com/Jaredcito-opsSoft/JDClinic) en una EC2 frontend y otra backend; instalar PostgreSQL en una tercera EC2. No se usa CloudFormation ni RDS.
 
 ## Topología
 
@@ -16,9 +16,11 @@ Las tres instancias deben estar en la **misma VPC**. Usa las **IP privadas** par
 
 Antes de empezar, anota `FRONT_PUBLIC_IP`, `BACK_PUBLIC_IP`, `BACK_PRIVATE_IP`, `DB_PRIVATE_IP`, la región del laboratorio y la ruta de la clave SSH. Elige tamaños de instancia permitidos por el laboratorio; backend necesita más memoria porque ejecuta API y n8n. Los recursos consumen el presupuesto de AWS Academy mientras permanecen encendidos. Si el laboratorio termina, las IP públicas pueden cambiar.
 
+El README visible del **Learner Lab** indica un presupuesto de **USD 50**, acceso en `us-east-1` y `us-west-2`, hasta 9 EC2 simultáneas y tipos de instancia de nano a large. La cifra mostrada en el panel puede tardar entre 8 y 12 horas en actualizarse. Para estas tres EC2, empieza en `us-east-1` con `t3.micro` para frontend, `t3.medium` para backend con n8n y `t3.small` para PostgreSQL, si esos tamaños aparecen disponibles al crear las instancias. Usa un volumen raíz gp3 pequeño en cada una y comprueba la estimación del asistente antes de lanzar. Si el backend no cabe o el laboratorio rechaza un tamaño, ajusta la elección en la consola y anótala en el registro de despliegue.
+
 ## 1. Crear las tres instancias
 
-En AWS Academy abre el laboratorio y la consola de EC2. Lanza tres instancias **Ubuntu Server 24.04 LTS** en la misma VPC y asigna sus grupos de seguridad conforme a la tabla. Asigna una clave SSH que puedas usar desde Windows. Verifica que las tres puedan descargar paquetes de Ubuntu y clonar GitHub. No abras 4000, 5432 ni 5679 a `0.0.0.0/0`.
+En AWS Academy abre el laboratorio y la consola de EC2. Lanza tres instancias **Ubuntu Server 24.04 LTS** en la misma VPC y asigna sus grupos de seguridad conforme a la tabla. En `us-east-1` el laboratorio ofrece la clave `vockey`; descarga su archivo **PEM** desde **AWS Details** y guárdalo fuera del repositorio. Para Ubuntu, el usuario SSH es `ubuntu`. Verifica que las tres EC2 puedan descargar paquetes de Ubuntu y clonar GitHub. No abras 4000, 5432 ni 5679 a `0.0.0.0/0`.
 
 En Windows, conecta a cada instancia cambiando IP y clave:
 
@@ -127,7 +129,7 @@ Desde Windows crea un túnel SSH, dejando la terminal abierta:
 ssh -i "C:\ruta\a\tu-clave.pem" -L 5679:127.0.0.1:5679 ubuntu@BACK_PUBLIC_IP
 ```
 
-Abre `http://localhost:5679` en Windows. Importa `n8n/telegram-ece.workflow.json` en el editor, configura **Header Auth** (`X-ECE-Secret` con el valor `N8N_WEBHOOK_SECRET` del backend), **Telegram API** y **SMTP**, cambia `avisos@ejemplo.com` por el correo remitente real y publica el flujo. El JSON público no contiene tokens ni contraseñas. La credencial local de Windows no se traslada automáticamente a la EC2. La prueba SMTP local anterior agotó el tiempo de espera; vuelve a probar correo en AWS antes de declararlo funcional.
+Abre `http://localhost:5679` en Windows. Importa `n8n/telegram-ece.workflow.json` en el editor, configura **Header Auth** (`X-ECE-Secret` con el valor `N8N_WEBHOOK_SECRET` del backend), **Telegram API** y **SMTP**, cambia `avisos@ejemplo.com` por el correo remitente real y publica el flujo. El JSON público no contiene tokens ni contraseñas. Las credenciales del n8n local no se trasladan automáticamente a la EC2. El correo local se verificó de extremo a extremo el 11 de noviembre de 2026; repite la prueba en AWS porque la red de la EC2 es distinta.
 
 ## 5. Frontend: `jdclinic-front`
 
