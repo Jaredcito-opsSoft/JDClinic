@@ -93,3 +93,5 @@ La agenda y el panel usan la fecha de la clínica (`America/Mexico_City` por def
 Las recetas nuevas se exportan como PDF con folio único, sello de integridad y QR. Los estudios clínicos usan carga y lectura temporales de S3; configura bucket, permisos y CORS según [s3/README.md](s3/README.md). Estas integraciones requieren credenciales reales para probarse contra Telegram y AWS.
 
 Para el laboratorio escolar, [aws/README.md](aws/README.md) documenta el despliegue mediante GitHub en **tres EC2**: React/Nginx, API Node/n8n y PostgreSQL. Esta variante no usa RDS y deja el módulo S3 deshabilitado hasta configurar un bucket; consulta la diferencia con el documento maestro antes de presentarla como cumplimiento completo.
+
+Las consultas PostgreSQL para la evaluación de selección, proyección, unión, funciones, subconsultas y precedencia están en [sql/README.md](sql/README.md).
