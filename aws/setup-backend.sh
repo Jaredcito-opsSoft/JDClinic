@@ -35,7 +35,7 @@ fi
 set -a
 source /etc/jdclinic/backend.env
 set +a
-sudo -u ubuntu npm --prefix backend run db:sync
+sudo -u ubuntu env DATABASE_URL="$DATABASE_URL" npm --prefix backend run db:sync
 cp aws/jdclinic-backend.service /etc/systemd/system/jdclinic-backend.service
 systemctl daemon-reload
 systemctl enable --now jdclinic-backend
