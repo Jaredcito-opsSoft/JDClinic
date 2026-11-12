@@ -12,6 +12,20 @@
 
 Las tres instancias deben estar en la **misma VPC**. Usa las **IP privadas** para front → back y back → base de datos. La IP pública del frontend sirve para abrir la web. En la consola de EC2 crea tres grupos de seguridad con las reglas de la tabla; AWS permite referenciar otro grupo de seguridad como origen y así resuelve sus IP privadas. [Documentación de AWS](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html).
 
+### Al reabrir el laboratorio
+
+AWS Academy puede asignar nuevas IP públicas. El 12 de noviembre de 2026 la IP del frontend cambió a `18.212.124.214`; la web y `/api/v1/health` respondieron HTTP 200 después del reinicio. Consulta siempre la IP actual en **EC2 → Instancias** antes de abrir la web. Las IP privadas de estas tres EC2 permanecieron iguales.
+
+Actualiza el origen permitido en la instancia backend desde **EC2 → jdclinic-back → Conectar → Administrador de sesiones de SSM**. Sustituye `NUEVA_IP_FRONTEND` por la IP pública actual:
+
+```bash
+sudo sed -i 's|^FRONTEND_URL=.*|FRONTEND_URL=http://NUEVA_IP_FRONTEND|' /etc/jdclinic/backend.env
+sudo systemctl restart jdclinic-backend
+curl --retry 10 --retry-delay 2 --retry-connrefused -fsS http://127.0.0.1:4000/api/v1/health
+```
+
+El backend volvió a quedar `Online` en SSM después de un reinicio de esa EC2. Si Session Manager muestra «not connected» aunque EC2 indique 3/3 comprobaciones, espera a que SSM se registre y revisa el estado del agente antes de continuar.
+
 > **Diferencia con el documento maestro:** este laboratorio usa PostgreSQL en EC2. El enunciado original pide RDS PostgreSQL cifrado, así que este despliegue demuestra la aplicación, pero no cumple literalmente el componente RDS. S3 sigue siendo opcional en esta guía; sin bucket, el módulo de estudios clínicos queda deshabilitado. Usa solo pacientes ficticios en el laboratorio.
 
 Antes de empezar, anota `FRONT_PUBLIC_IP`, `BACK_PRIVATE_IP`, `DB_PRIVATE_IP` y la región del laboratorio. Elige tamaños de instancia permitidos por el laboratorio; backend necesita más memoria porque ejecuta API y n8n. Los recursos consumen el presupuesto de AWS Academy mientras permanecen encendidos. Si el laboratorio termina, las IP públicas pueden cambiar.
