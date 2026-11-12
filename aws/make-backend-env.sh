@@ -14,8 +14,11 @@ DB_HOST="$1"
 FRONTEND_ORIGIN="$2"
 AWS_REGION="$3"
 AWS_S3_BUCKET_NAME="${4:-}"
-read -rsp 'Contraseña de jdclinic_app en PostgreSQL: ' DB_PASSWORD
-echo
+DB_PASSWORD="${JDCLINIC_DB_PASSWORD:-}"
+if [[ -z "$DB_PASSWORD" ]]; then
+  read -rsp 'Contraseña de jdclinic_app en PostgreSQL: ' DB_PASSWORD
+  echo
+fi
 export DB_HOST FRONTEND_ORIGIN AWS_REGION AWS_S3_BUCKET_NAME DB_PASSWORD
 
 install -d -m 700 -o ubuntu -g ubuntu /etc/jdclinic
