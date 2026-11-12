@@ -1,28 +1,65 @@
 # JDClinic en AWS Academy: tres EC2
 
-**Estado al 11 de noviembre de 2026:** preparado para despliegue; el laboratorio estaba terminado y la sesión del curso había caducado. Aún no se han creado instancias ni subido datos a AWS. Esta guía reproduce el esquema de TallerShop: clonar [JDClinic](https://github.com/Jaredcito-opsSoft/JDClinic) en una EC2 frontend y otra backend; instalar PostgreSQL en una tercera EC2. No se usa CloudFormation ni RDS.
+**Estado al 11 de noviembre de 2026:** tres EC2 y sus grupos de seguridad creados en el Learner Lab, región `us-east-1`. Nginx/React, API, PostgreSQL y el contenedor n8n ya responden. El flujo de avisos se importó a n8n, pero permanece inactivo hasta configurar las credenciales de Telegram, SMTP y Header Auth. Esta guía reproduce el esquema de TallerShop: clonar [JDClinic](https://github.com/Jaredcito-opsSoft/JDClinic) en una EC2 frontend y otra backend; instalar PostgreSQL en una tercera EC2. No se usa CloudFormation ni RDS.
 
 ## Topología
 
 | Instancia Ubuntu 24.04 | Servicio | Puerto de entrada |
 |---|---|---|
-| `jdclinic-front` | Nginx y React compilado | 80 desde Internet; 22 desde tu IP |
-| `jdclinic-back` | API Node, trabajador de avisos y n8n | 4000 solo desde el grupo de seguridad del frontend; 22 desde tu IP |
-| `jdclinic-db` | PostgreSQL y volumen EBS persistente | 5432 solo desde el grupo de seguridad del backend; 22 desde tu IP |
+| `jdclinic-front` | Nginx y React compilado | 80 desde Internet |
+| `jdclinic-back` | API Node, trabajador de avisos y n8n | 4000 solo desde el grupo de seguridad del frontend |
+| `jdclinic-db` | PostgreSQL y volumen EBS persistente | 5432 solo desde el grupo de seguridad del backend |
 
-Las tres instancias deben estar en la **misma VPC**. Usa las **IP privadas** para front → back y back → base de datos. Las IP públicas sirven para entrar por SSH y abrir la web. En la consola de EC2 crea tres grupos de seguridad con las reglas de la tabla; AWS permite referenciar otro grupo de seguridad como origen y así resuelve sus IP privadas. [Documentación de AWS](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html).
+Las tres instancias deben estar en la **misma VPC**. Usa las **IP privadas** para front → back y back → base de datos. La IP pública del frontend sirve para abrir la web. En la consola de EC2 crea tres grupos de seguridad con las reglas de la tabla; AWS permite referenciar otro grupo de seguridad como origen y así resuelve sus IP privadas. [Documentación de AWS](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html).
 
 > **Diferencia con el documento maestro:** este laboratorio usa PostgreSQL en EC2. El enunciado original pide RDS PostgreSQL cifrado, así que este despliegue demuestra la aplicación, pero no cumple literalmente el componente RDS. S3 sigue siendo opcional en esta guía; sin bucket, el módulo de estudios clínicos queda deshabilitado. Usa solo pacientes ficticios en el laboratorio.
 
-Antes de empezar, anota `FRONT_PUBLIC_IP`, `BACK_PUBLIC_IP`, `BACK_PRIVATE_IP`, `DB_PRIVATE_IP`, la región del laboratorio y la ruta de la clave SSH. Elige tamaños de instancia permitidos por el laboratorio; backend necesita más memoria porque ejecuta API y n8n. Los recursos consumen el presupuesto de AWS Academy mientras permanecen encendidos. Si el laboratorio termina, las IP públicas pueden cambiar.
+Antes de empezar, anota `FRONT_PUBLIC_IP`, `BACK_PRIVATE_IP`, `DB_PRIVATE_IP` y la región del laboratorio. Elige tamaños de instancia permitidos por el laboratorio; backend necesita más memoria porque ejecuta API y n8n. Los recursos consumen el presupuesto de AWS Academy mientras permanecen encendidos. Si el laboratorio termina, las IP públicas pueden cambiar.
 
-El README visible del **Learner Lab** indica un presupuesto de **USD 50**, acceso en `us-east-1` y `us-west-2`, hasta 9 EC2 simultáneas y tipos de instancia de nano a large. La cifra mostrada en el panel puede tardar entre 8 y 12 horas en actualizarse. Para estas tres EC2, empieza en `us-east-1` con `t3.micro` para frontend, `t3.medium` para backend con n8n y `t3.small` para PostgreSQL, si esos tamaños aparecen disponibles al crear las instancias. Usa un volumen raíz gp3 pequeño en cada una y comprueba la estimación del asistente antes de lanzar. Si el backend no cabe o el laboratorio rechaza un tamaño, ajusta la elección en la consola y anótala en el registro de despliegue.
+El README visible del **Learner Lab** indica un presupuesto de **USD 50**, acceso en `us-east-1` y `us-west-2`, hasta 9 EC2 simultáneas y tipos de instancia de nano a large. La cifra mostrada en el panel puede tardar entre 8 y 12 horas en actualizarse. En este laboratorio se eligieron `t3.small` para frontend y PostgreSQL, y `t3.medium` para backend con n8n. Los recursos consumen presupuesto mientras permanecen encendidos; detén las EC2 cuando no hagas pruebas.
+
+## Registro de este laboratorio
+
+| Componente | ID | IP privada | IP pública inicial | Disco raíz |
+|---|---|---|---|---|
+| Frontend | `i-07329b4e1b812f749` | `172.31.34.196` | `52.71.177.117` | 10 GiB gp3 |
+| Backend | `i-08a1ba1ee7d0a9bf8` | `172.31.44.176` | `13.221.8.127` | 20 GiB gp3 |
+| PostgreSQL | `i-01bf88c12813a7335` | `172.31.36.132` | `3.95.233.227` | 10 GiB gp3 |
+
+La VPC es `vpc-027ba65903b78a33f` y la subred `subnet-076b780257d2022f9` (`us-east-1a`). Se usó Ubuntu 24.04, AMI `ami-08b275ac6cc5dbefb`, y el perfil `LabInstanceProfile` para Systems Manager. Los agentes SSM de las tres EC2 se verificaron `Online`. No se abrió SSH: `sg-01586986350954711` permite 80 desde Internet, `sg-0158b725d4fae1015` permite 4000 solo desde el grupo frontend y `sg-02a30e8e3c0f33360` permite 5432 solo desde el grupo backend. Las IP públicas pueden cambiar al detener/iniciar las instancias.
+
+**Pruebas verificadas:** PostgreSQL y el instalador backend terminaron en estado `Success`; `http://52.71.177.117/` devolvió HTTP 200; `http://52.71.177.117/api/v1/health` devolvió HTTP 200 y `database.status = connected` con `currentDatabase = jdclinic`; el backend respondió localmente en `127.0.0.1:4000`; `http://127.0.0.1:5679/healthz` devolvió `{"status":"ok"}` y el contenedor `jdclinic-n8n` estaba `Up`. Se importó correctamente un flujo n8n. La primera orden frontend terminó con error porque verificó la API mientras PostgreSQL aún se instalaba; una orden posterior comprobó frontend y proxy en `Success`. La primera orden PostgreSQL falló porque Ubuntu no ofrecía `awscli` mediante APT; se corrigió el instalador para usar la distribución oficial de AWS. No se han probado todavía avisos reales en la instancia AWS. Por decisión del propietario, no se creó la cuenta administrativa inicial; la base AWS está vacía.
+
+Los `CommandId` que dejaron evidencia del despliegue son: PostgreSQL `f694bec3-3517-4687-9275-e969722f7ef9`; backend `b2ff6a38-81d7-4e8d-b447-c0a86030df37`; prueba frontend/proxy `8c0b4165-502d-415d-a892-4d931e84142a`; prueba n8n `f39f94a7-872d-47b3-99bc-73a4c2006b25`; importación del flujo `3c2bf532-4576-4068-9935-4d7c3ea8348e`.
+
+Los instaladores repetibles están en `aws/setup-db.sh`, `aws/setup-backend.sh` y `aws/setup-front.sh`. Desde AWS CloudShell, el comando para cada máquina usa SSM y devuelve un `CommandId` para consultar su resultado:
+
+```bash
+aws ssm send-command --region us-east-1 --instance-ids i-01bf88c12813a7335 --document-name AWS-RunShellScript --parameters '{"commands":["curl -fsSL https://raw.githubusercontent.com/Jaredcito-opsSoft/JDClinic/ab552e0/aws/setup-db.sh -o /tmp/jdclinic-setup-db.sh && bash /tmp/jdclinic-setup-db.sh 172.31.36.132 172.31.44.176 us-east-1"]}' --query Command.CommandId --output text
+aws ssm send-command --region us-east-1 --instance-ids i-08a1ba1ee7d0a9bf8 --document-name AWS-RunShellScript --parameters '{"commands":["git clone https://github.com/Jaredcito-opsSoft/JDClinic.git /home/ubuntu/JDClinic && chown -R ubuntu:ubuntu /home/ubuntu/JDClinic && bash /home/ubuntu/JDClinic/aws/setup-backend.sh 172.31.36.132 52.71.177.117 us-east-1"]}' --query Command.CommandId --output text
+aws ssm send-command --region us-east-1 --instance-ids i-07329b4e1b812f749 --document-name AWS-RunShellScript --parameters '{"commands":["git clone https://github.com/Jaredcito-opsSoft/JDClinic.git /home/ubuntu/JDClinic && chown -R ubuntu:ubuntu /home/ubuntu/JDClinic && bash /home/ubuntu/JDClinic/aws/setup-front.sh 172.31.44.176"]}' --query Command.CommandId --output text
+```
+
+```bash
+aws ssm get-command-invocation --region us-east-1 --command-id COMMAND_ID --instance-id INSTANCE_ID --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+```
+
+Para verificar la web desde tu equipo:
+
+```powershell
+Invoke-WebRequest -Uri 'http://52.71.177.117/'
+Invoke-RestMethod -Uri 'http://52.71.177.117/api/v1/health'
+```
+
+Antes del instalador de PostgreSQL, crea el parámetro `SecureString` `/jdclinic/lab/db-password` mediante CloudShell, introduciendo la contraseña directamente en la terminal y sin escribirla en el repositorio. Se lee con el perfil de las instancias. En una cuenta normal, restringe ese permiso a las dos EC2 que lo necesitan. **Si se escribe una contraseña en un chat o en la línea visible de CloudShell, no la reutilices; cámbiala desde la entrada oculta `read -rsp`.**
 
 ## 1. Crear las tres instancias
 
 En AWS Academy abre el laboratorio y la consola de EC2. Lanza tres instancias **Ubuntu Server 24.04 LTS** en la misma VPC y asigna sus grupos de seguridad conforme a la tabla. En `us-east-1` el laboratorio ofrece la clave `vockey`; descarga su archivo **PEM** desde **AWS Details** y guárdalo fuera del repositorio. Para Ubuntu, el usuario SSH es `ubuntu`. Verifica que las tres EC2 puedan descargar paquetes de Ubuntu y clonar GitHub. No abras 4000, 5432 ni 5679 a `0.0.0.0/0`.
 
-En Windows, conecta a cada instancia cambiando IP y clave:
+En este laboratorio se utilizó SSM y el puerto 22 permanece cerrado. Los comandos SSH siguientes solo funcionan si, por decisión tuya, agregas una regla 22 limitada a tu IP y descargas la clave PEM del laboratorio. No necesitas SSH para repetir las pruebas ni los instaladores.
+
+En Windows, si habilitas SSH, conecta a cada instancia cambiando IP y clave:
 
 ```powershell
 ssh -i "C:\ruta\a\tu-clave.pem" ubuntu@FRONT_PUBLIC_IP
@@ -31,6 +68,8 @@ ssh -i "C:\ruta\a\tu-clave.pem" ubuntu@DB_PUBLIC_IP
 ```
 
 Las secciones siguientes indican **en qué EC2** ejecutar cada bloque. [EC2 explica cómo restringir SSH a tu IP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules-reference.html).
+
+También puedes abrir una terminal sin SSH desde la consola AWS: **EC2 → Instancias → selecciona la EC2 → Conectar → Session Manager → Conectar**. Para instalar o cambiar servicios, ejecuta `sudo -i` dentro de esa sesión. El perfil `LabInstanceProfile` permite la conexión en este laboratorio.
 
 ## 2. Base de datos: `jdclinic-db`
 
@@ -97,6 +136,8 @@ npm --prefix backend run admin:create
 unset JDCLINIC_ADMIN_PASSWORD
 ```
 
+Para hacerlo más tarde en el laboratorio ya desplegado, abre una sesión de **Session Manager** hacia `i-08a1ba1ee7d0a9bf8` y usa `sudo -i`, `cd /home/ubuntu/JDClinic`, `set -a; source /etc/jdclinic/backend.env; set +a`, y después el bloque anterior. Escribe la contraseña solo en el prompt oculto; no la pongas en CloudShell, GitHub ni el chat. El correo elegido anteriormente fue `robertope2016@gmail.com`, pero puedes usar otro al crear la cuenta.
+
 Instala la API como servicio para que arranque tras reiniciar la EC2:
 
 ```bash
@@ -123,7 +164,22 @@ sudo docker compose -f n8n/compose.yaml ps
 curl -fsS http://127.0.0.1:5679/healthz
 ```
 
-Desde Windows crea un túnel SSH, dejando la terminal abierta:
+El flujo se importó sin credenciales y quedó inactivo mediante:
+
+```bash
+sudo docker cp ~/JDClinic/n8n/telegram-ece.workflow.json jdclinic-n8n:/tmp/jdclinic-workflow.json
+sudo docker exec jdclinic-n8n n8n import:workflow --input=/tmp/jdclinic-workflow.json
+```
+
+En el laboratorio actual, 5679 y 22 permanecen cerrados al público. Para abrir el editor n8n sin cambiar el grupo de seguridad, instala AWS CLI y Session Manager Plugin en tu equipo, carga temporalmente las credenciales del Learner Lab desde **AWS Details** y ejecuta:
+
+```powershell
+aws ssm start-session --region us-east-1 --target i-08a1ba1ee7d0a9bf8 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["5679"],"localPortNumber":["5679"]}'
+```
+
+Con esa terminal abierta, visita `http://localhost:5679`. La instalación es nueva: crea el propietario de n8n, conecta Telegram API, SMTP y Header Auth, reemplaza el remitente de ejemplo y activa el flujo antes de probar una cita ficticia. No compartas tokens ni contraseñas en GitHub.
+
+Como alternativa al túnel SSM anterior, si habilitas SSH de forma temporal, crea un túnel SSH desde Windows dejando la terminal abierta:
 
 ```powershell
 ssh -i "C:\ruta\a\tu-clave.pem" -L 5679:127.0.0.1:5679 ubuntu@BACK_PUBLIC_IP
