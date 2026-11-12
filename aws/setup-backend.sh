@@ -10,7 +10,12 @@ FRONT_IP="$2"
 REGION="$3"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y git curl python3 awscli
+apt-get install -y git curl python3 unzip
+if ! command -v aws >/dev/null 2>&1; then
+  curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/jdclinic-awscliv2.zip
+  unzip -qo /tmp/jdclinic-awscliv2.zip -d /tmp/jdclinic-awscli
+  /tmp/jdclinic-awscli/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+fi
 curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/jdclinic-nodesource.sh
 bash /tmp/jdclinic-nodesource.sh
 apt-get install -y nodejs

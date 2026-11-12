@@ -10,7 +10,12 @@ BACK_IP="$2"
 REGION="$3"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y postgresql postgresql-client awscli
+apt-get install -y postgresql postgresql-client curl unzip
+if ! command -v aws >/dev/null 2>&1; then
+  curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/jdclinic-awscliv2.zip
+  unzip -qo /tmp/jdclinic-awscliv2.zip -d /tmp/jdclinic-awscli
+  /tmp/jdclinic-awscli/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+fi
 
 DB_PASSWORD="$(aws ssm get-parameter --name /jdclinic/lab/db-password --with-decryption --region "$REGION" --query Parameter.Value --output text)"
 if [[ -z "$DB_PASSWORD" || "$DB_PASSWORD" == None ]]; then
