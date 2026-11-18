@@ -71,8 +71,8 @@ chown ubuntu:ubuntu "$ENV_FILE"
 
 docker start jdclinic-n8n >/dev/null
 systemctl restart jdclinic-backend
-curl --retry 20 --retry-delay 2 --retry-connrefused -fsS http://127.0.0.1:5679/healthz >/dev/null
-curl --retry 20 --retry-delay 2 --retry-connrefused -fsS http://127.0.0.1:4000/api/v1/health >/dev/null
+curl --retry 20 --retry-delay 2 --retry-connrefused --retry-all-errors -fsS http://127.0.0.1:5679/healthz >/dev/null
+curl --retry 20 --retry-delay 2 --retry-connrefused --retry-all-errors -fsS http://127.0.0.1:4000/api/v1/health >/dev/null
 
 python3 - <<'PY'
 import sqlite3
