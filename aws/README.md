@@ -12,7 +12,7 @@ cd JDClinic
 bash aws/refresh-lab.sh
 ```
 
-Si `JDClinic` ya existe en CloudShell, usa `cd JDClinic && git pull --ff-only && bash aws/refresh-lab.sh`. El script detiene la EC2 antigua, inicia las EC2 necesarias y RDS, actualiza el origen S3, configura HTTPS y muestra la URL final. Para comprobar citas y avisos desde el backend, ejecuta `bash aws/smoke-appointment-notifications.sh` allí mediante SSM. Al terminar la demostración, detén `jdclinic-rds` y pulsa **End Lab** en Vocareum; el laboratorio detiene también las EC2. RDS puede reiniciarse automáticamente tras siete días detenido, así que comprueba su estado cuando vuelva a abrirse el Lab.
+Si `JDClinic` ya existe en CloudShell, usa `cd JDClinic && git pull --ff-only && bash aws/refresh-lab.sh`. El script detiene la EC2 antigua, inicia las EC2 necesarias y RDS, actualiza el origen S3, configura HTTPS y muestra la URL final. Para comprobar citas y avisos desde el backend, ejecuta `bash aws/smoke-appointment-notifications.sh` allí mediante SSM. Al terminar la demostración, ejecuta `bash aws/stop-lab.sh` en CloudShell y después pulsa **End Lab** en Vocareum; el laboratorio detiene también las EC2. RDS puede reiniciarse automáticamente tras siete días detenido, así que comprueba su estado cuando vuelva a abrirse el Lab.
 
 ### Registro anterior (configuración original con PostgreSQL en EC2)
 
