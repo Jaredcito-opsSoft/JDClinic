@@ -15,3 +15,4 @@ coverage/
 .interface-design/
 aws/secrets/
 *.tgz
+__pycache__/

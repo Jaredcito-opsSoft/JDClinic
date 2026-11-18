@@ -1,4 +1,20 @@
-# JDClinic en AWS Academy: tres EC2
+# JDClinic en AWS Academy
+
+## Estado actual (17 de noviembre de 2026)
+
+La arquitectura de la demostración usa frontend React/Nginx en EC2, API Node y n8n en otra EC2, PostgreSQL cifrado en RDS y estudios en S3 privado. La EC2 antigua de PostgreSQL se mantiene detenida como respaldo de transición. El flujo n8n está activo; sus credenciales de correo y Telegram están configuradas en la instancia backend. El resto de esta guía conserva el registro histórico del montaje inicial con tres EC2.
+
+Para la demostración de mañana: inicia el Learner Lab, abre AWS CloudShell en `us-east-1`, ejecuta los comandos siguientes y espera a que la web responda. La IP pública cambia al reiniciar el laboratorio; `sslip.io` proporciona el nombre DNS correspondiente y Certbot instala el certificado HTTPS. RDS puede tardar varios minutos en arrancar.
+
+```bash
+git clone https://github.com/Jaredcito-opsSoft/JDClinic.git JDClinic
+cd JDClinic
+bash aws/refresh-lab.sh
+```
+
+Si `JDClinic` ya existe en CloudShell, usa `cd JDClinic && git pull --ff-only && bash aws/refresh-lab.sh`. El script detiene la EC2 antigua, inicia las EC2 necesarias y RDS, actualiza el origen S3, configura HTTPS y muestra la URL final. Para comprobar citas y avisos desde el backend, ejecuta `bash aws/smoke-appointment-notifications.sh` allí mediante SSM. Al terminar la demostración, detén `jdclinic-rds` y pulsa **End Lab** en Vocareum; el laboratorio detiene también las EC2. RDS puede reiniciarse automáticamente tras siete días detenido, así que comprueba su estado cuando vuelva a abrirse el Lab.
+
+### Registro anterior (configuración original con PostgreSQL en EC2)
 
 **Estado al 12 de noviembre de 2026:** tres EC2 y sus grupos de seguridad creados en el Learner Lab, región `us-east-1`. Nginx/React, API, PostgreSQL y el contenedor n8n ya responden. El flujo de avisos se importó a n8n, pero permanece inactivo hasta configurar las credenciales de Telegram, SMTP y Header Auth. La cuenta administrativa inicial ya está creada. Esta guía reproduce el esquema de TallerShop: clonar [JDClinic](https://github.com/Jaredcito-opsSoft/JDClinic) en una EC2 frontend y otra backend; instalar PostgreSQL en una tercera EC2. No se usa CloudFormation ni RDS.
 
