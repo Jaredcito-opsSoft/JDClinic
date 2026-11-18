@@ -7,7 +7,7 @@ dotenv.config({ override: process.env.NODE_ENV !== 'production' });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  DEPLOYMENT_MODE: z.enum(['managed-rds', 'academy-ec2']).default('managed-rds'),
+  DEPLOYMENT_MODE: z.enum(['managed-rds', 'academy-ec2', 'academy-rds']).default('managed-rds'),
   PORT: z.string().default('4000').transform(Number),
   DATABASE_URL: z.string().url().default('postgresql://postgres:postgres@localhost:5432/expediente_clinico_db?schema=public'),
   CLINICAL_FLE_MASTER_KEY: z.string().length(64).default('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
@@ -34,13 +34,13 @@ const envSchema = z.object({
       context.addIssue({ code: 'custom', path: [name], message: `${name} debe configurarse para producción.` });
     }
   }
-  if (value.DEPLOYMENT_MODE === 'managed-rds' && !value.AWS_S3_BUCKET_NAME) {
+  if (value.DEPLOYMENT_MODE !== 'academy-ec2' && !value.AWS_S3_BUCKET_NAME) {
     context.addIssue({ code: 'custom', path: ['AWS_S3_BUCKET_NAME'], message: 'Configura S3 en el despliegue administrado.' });
   }
   if (value.DEPLOYMENT_MODE === 'managed-rds' && !value.FRONTEND_URL.startsWith('https://')) {
     context.addIssue({ code: 'custom', path: ['FRONTEND_URL'], message: 'El frontend de producción requiere HTTPS.' });
   }
-  if (value.DEPLOYMENT_MODE === 'managed-rds' && !value.DATABASE_URL.includes('sslmode=require')) {
+  if (value.DEPLOYMENT_MODE !== 'academy-ec2' && !value.DATABASE_URL.includes('sslmode=require')) {
     context.addIssue({ code: 'custom', path: ['DATABASE_URL'], message: 'La conexión a RDS debe exigir TLS.' });
   }
 });
