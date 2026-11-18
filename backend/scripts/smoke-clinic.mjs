@@ -9,6 +9,9 @@ const s3 = new S3Client({ region: process.env.AWS_REGION });
 const base = 'http://127.0.0.1:4000/api/v1';
 const suffix = randomUUID().slice(0, 8);
 const password = randomBytes(24).toString('base64url');
+const testEmail = process.env.JDCLINIC_TEST_EMAIL;
+const testChatId = process.env.JDCLINIC_TEST_CHAT_ID;
+assert.equal(Boolean(testEmail), Boolean(testChatId), 'Configura correo y chat juntos para probar avisos.');
 let adminId;
 let doctorId;
 let patientId;
@@ -51,10 +54,17 @@ try {
 
   const patient = await request('/patients', { token: adminToken, method: 'POST', body: {
     firstName: 'Paciente', lastName: 'Prueba', birthDate: '1995-02-20', sex: 'MASCULINO', phone: '5555550101',
+    ...(testEmail ? { email: testEmail } : {}),
   } });
   assert.equal(patient.status, 201, `Paciente: ${JSON.stringify(patient.body)}`);
   patientId = patient.body.data.id;
   assert.equal((await request(`/patients/${patientId}`, { token: adminToken })).status, 200);
+  if (testChatId) {
+    const reminders = await request(`/patients/${patientId}/reminders`, {
+      token: adminToken, method: 'PATCH', body: { chatId: testChatId, consent: true },
+    });
+    assert.equal(reminders.status, 200, `Telegram: ${JSON.stringify(reminders.body)}`);
+  }
 
   const scheduledAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const appointmentBody = { patientId, doctorId, scheduledAt, durationMinutes: 30, reason: 'Prueba automatizada' };
@@ -69,6 +79,26 @@ try {
   const agenda = await request(`/appointments?date=${clinicDate(new Date(scheduledAt))}`, { token: doctorToken });
   assert.equal(agenda.status, 200);
   assert.ok(agenda.body.data.some(row => row.id === appointment.body.data.id));
+
+  if (testEmail && testChatId) {
+    let deliveries = [];
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const current = await request(`/appointments?date=${clinicDate(new Date(scheduledAt))}`, { token: doctorToken });
+      assert.equal(current.status, 200);
+      deliveries = current.body.data.find(row => row.id === appointment.body.data.id)?.notifications || [];
+      const confirmations = deliveries.filter(item => [
+        'APPOINTMENT_CONFIRMATION_PATIENT_EMAIL', 'APPOINTMENT_CONFIRMATION_PATIENT_TELEGRAM',
+      ].includes(item.type));
+      if (confirmations.length === 2 && confirmations.every(item => item.status === 'SENT')) break;
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    const confirmations = deliveries.filter(item => [
+      'APPOINTMENT_CONFIRMATION_PATIENT_EMAIL', 'APPOINTMENT_CONFIRMATION_PATIENT_TELEGRAM',
+    ].includes(item.type));
+    assert.equal(confirmations.length, 2, `Avisos incompletos: ${JSON.stringify(deliveries)}`);
+    assert.ok(confirmations.every(item => item.status === 'SENT'), `Avisos no enviados: ${JSON.stringify(confirmations)}`);
+    console.log('Cita → cola → n8n → correo y Telegram: ambos avisos enviados.');
+  }
 
   const bytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
   const initiated = await request(`/patients/${patientId}/attachments/upload`, { token: doctorToken, method: 'POST', body: {
