@@ -21,7 +21,11 @@ aws s3 cp "s3://$BUCKET/migration/jdclinic-n8n-data.tar.gz" "$ARCHIVE" --region 
 aws s3 cp "s3://$BUCKET/migration/webhook-secret.txt" "$SECRET_FILE" --region "$REGION" --only-show-errors
 test -s "$ARCHIVE"
 test -s "$SECRET_FILE"
-tar -tzf "$ARCHIVE" | grep -qx './.n8n/config' || tar -tzf "$ARCHIVE" | grep -qx '.n8n/config'
+ARCHIVE_LIST="$(tar -tzf "$ARCHIVE")"
+if ! grep -qxE '^\.?/?\.n8n/config$' <<<"$ARCHIVE_LIST"; then
+  echo 'El respaldo n8n no incluye la clave de cifrado.' >&2
+  exit 1
+fi
 
 docker stop jdclinic-n8n >/dev/null
 tar -czf /tmp/jdclinic-n8n-before-restore.tar.gz -C "$VOL_DIR" .
